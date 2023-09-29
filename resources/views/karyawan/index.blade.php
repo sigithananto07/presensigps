@@ -99,6 +99,7 @@
                                       <th>NO. HP</th>
                                       <th>FOTO</th>
                                       <th>DEPARTEMEN</th>
+                                      <th>CABANG</th>
                                       <th>AKSI</th>
                                  </tr>   
                               </thead>
@@ -121,6 +122,7 @@
                                           @endif
                                       </td>
                                       <td>{{ $d->nama_dept }}</td> 
+                                      <td>{{ $d->kode_cabang }}</td>
                                       <td>
                                           <div class="btn-group">
                                             <a href="#" class="edit btn btn-info btn-sm" nik="{{ $d->nik }}">
@@ -132,6 +134,14 @@
                                              </svg>
                                             </a>
                                             
+                                            <div class="btn-group">
+                                              <a href="/konfigurasi/{{ $d->nik }}/setjamkerja" class="btn btn-success btn-sm">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-settings" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                                  <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                                  <path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"></path>
+                                                  <path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"></path>
+                                               </svg>
+                                              </a>
                                             <form action="/karyawan/{{ $d->nik }}/delete" method="POST" style="margin-left:8px">
                                               @csrf
                                               <a class="btn btn-danger btn-sm delete-confirm">
@@ -185,7 +195,7 @@
                     <path d="M19 11l0 2"></path>
                  </svg>
                 </span>
-                <input type="text" value="" id="nik" class="form-control" placeholder="Nik" name="nik">
+                <input type="text" maxlength="7"  value="" id="nik" class="form-control" placeholder="Nik" name="nik">
               </div>
              </div> 
           </div> 
@@ -248,11 +258,21 @@
               <select name="kode_dept" id="kode_dept" class="form-select">
                 <option value="">Departemen</option>
                 @foreach ($departemen as $d)
-                   <option {{ Request('kode_dept')==$d->kode_dept ? 'selected' : '' }} value="{{ $d->kode_dept }}">{{ $d->nama_dept }}</option>
+                   <option value="{{ $d->kode_dept }}">{{ $d->nama_dept }}</option>
                 @endforeach
             </select>
             </div> 
         </div>  
+        <div class="row mt-3">
+          <div class="col-12">
+            <select name="kode_cabang" id="kode_cabang" class="form-select">
+              <option value="">Cabang</option>
+              @foreach ($cabang as $d)
+                 <option value="{{ $d->kode_cabang }}">{{ strtoupper ($d->nama_cabang) }}</option>
+              @endforeach
+          </select>
+          </div> 
+      </div>
         <div class="row mt-3">
            <div class="col-12">
                <div class="form-group">
@@ -291,6 +311,8 @@
 @push('myscript')
 <script>
      $(function() {
+        $("#nik").mask("0000000");
+        $("#no_hp").mask("0000000000000");
         $("#btnTambahKaryawan").click(function() {
            $("#modal-inputkaryawan").modal("show"); 
         });

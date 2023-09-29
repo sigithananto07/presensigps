@@ -38,8 +38,7 @@
 .tablepresensi tr th {
    border: 1px solid #131212;
    padding: 8px;
-   background-color: #dbdbdb;
-   font-size: 10px
+   background-color: #dbdbdb
 }
 
 .tablepresensi tr td {
@@ -58,7 +57,7 @@
 
 <!-- Set "A5", "A4" or "A3" for class name -->
 <!-- Set also "landscape" if you need -->
-<body class="A4 landscape">
+<body class="A4">
 <?php
 function selisih($jam_masuk, $jam_keluar)
         {
@@ -89,7 +88,7 @@ function selisih($jam_masuk, $jam_keluar)
             </td> 
              <td>
                  <span id="title">
-                    REKAP PRESENSI KERYAWAN<br>
+                    LAPORAN PRESENSI KERYAWAN<br>
                     PERIODE {{ strtoupper ($namabulan[$bulan]) }} {{ $tahun }}<br>
                     PT. METISKA FARMA<br>
                  </span>  
@@ -97,69 +96,96 @@ function selisih($jam_masuk, $jam_keluar)
              </td>     
         </tr>    
     </table>    
-    <table class="tablepresensi">
-        <tr>
-             <th rowspan="2">Nik</th>
-             <th rowspan="2">Nama karyawan</th>
-             <th colspan="31">Tanggal</th>  
-             <th rowspan="2">TH</th>
-             <th rowspan="2">TT</th>
+      <table class="tabledatakaryawan">
+          <tr>
+              <td rowspan="6">
+                 @php
+                    $path = Storage::url('uploads/karyawan/'.$karyawan->foto)
+                 @endphp
+                 <img src="{{ url($path) }}" alt="" width="120" height="150">
+              </td>  
+         </tr> 
+          <tr>
+             <td>NIK</td>
+             <td>:</td>
+             <td>{{ $karyawan->nik }}
           </tr>    
-        <tr>
-            <?php
-             for($i=1; $i <= 31; $i++){
-            ?>
-            <th>{{ $i }}</th>
-            <?php
-             }
-             ?>
-        </tr>  
-        @foreach ($rekap as $d)
+          <tr>
+            <td>Nama Karyawan</td>
+            <td>:</td>
+            <td>{{ $karyawan->nama_lengkap }}
+         </tr>  
          <tr>
-             <td>{{ $d->nik }}</td>
-             <td>{{ $d->nama_lengkap }}</td>
+          <td>Jabatan</td>
+          <td>:</td>
+          <td>{{ $karyawan->jabatan }}
+        </tr> 
+          <tr>
+            <td>Departemen</td>
+            <td>:</td>
+            <td>{{ $karyawan->nama_dept }}
+          </tr>   
+          <tr>
+            <td>No. HP</td>
+            <td>:</td>
+            <td>{{ $karyawan->no_hp }}
+          </tr>           
+      </table>  
+      <table class="tablepresensi">
+         <tr>
+             <th>No.</th>
+             <th>Tanggal</th>
+             <th>Jam Masuk</th>
              
-             <?php
-             $totalhadir = 0;
-             $totalterlambat = 0;
-             for($i=1; $i <= 31; $i++){
-             $tgl = "tgl_".$i;
-             if(empty($d->$tgl)) {
-                  $hadir = ['',''];
-                  $totalhadir += 0;
-             }else{
-               $hadir = explode("-",$d->$tgl);   
-               $totalhadir += 1;
-               if($hadir[0] > $d->jam_masuk) {
-                  $totalterlambat +=1;
-               }
-             }
+             <th>Jam Pulang</th>
+             
+             <th>Keterangan</th>
+             <th>Jml Jam</th>
 
-            ?>
-            <td>
-            <span style="color:{{ $hadir[0]> $d->jam_masuk ? "red" : "" }}">{{ !empty($hadir[0]) ? $hadir[0] : '-'}}</span><br>
-            <span style="color:{{ $hadir[1]< $d->jam_pulang ? "red" : "" }}">{{ !empty($hadir[1]) ? $hadir[1] : '-'}}</span><br>
-            </td>
-            
-            <?php
-             }
-             ?>
-             <td>{{ $totalhadir }}</td>
-             <td>{{ $totalterlambat }}</td>
-
-         </tr>       
-        @endforeach  
-    </table>
-      
-         <table width="100%" style="margin-top: 100px"> 
+         </tr> 
+           @foreach($presensi as $d)
+           @php
+                    
+                    $jamterlambat = selisih('08:00:00',$d->jam_in);
+           
+           @endphp
             <tr>
-                <td></td>
-               <td style="text-align: center">Jakarta, {{ date('d-m-Y') }}</td>
+              <td>{{ $loop->iteration }}</td>
+              <td>{{ date("d-m-y",strtotime($d->tgl_presensi)) }}</td>
+              <td>{{ $d->jam_in }}</td>
+              
+              <td>{{ $d->jam_out != null ? $d->jam_out : "Belum Absen" }}</td>
+              
+              <td>
+                 @if ($d->jam_in > "08:00")
+                 Terlambat {{ $jamterlambat }}                 
+                 @else
+                 Tepat Waktu
+                 @endif
+              </td>
+                 <td>
+                    @if ($d->jam_out != null)
+                    @php
+                      $jmljamkerja = selisih($d->jam_in,$d->jam_out);                 
+                    @endphp
+                    @else
+                    @php
+                    $jmljamkerja = 0;
+                    @endphp
+                    @endif
+                    {{ $jmljamkerja }}
+                </td>
+            </tr>  
+          @endforeach
+      </table>
+         <table width="100%" style="margin-top: 30px"> 
+            <tr>
+               <td colspan="2" style="text-align: right">Jakarta, {{ date('d-m-Y') }}</td>
             </tr>  
                 <tr>
                     <td style="text-align:center; vertical-align:bottom" height="69px">
                         <u>Sobron</u><br>
-                        <i><b>HRD Manager</b></i> 
+                        <i><b>HRD Manager</b></i>
                    </td>
                    <td style="text-align:center; vertical-align:bottom">
                     <u>Doni Wibowo</u><br>

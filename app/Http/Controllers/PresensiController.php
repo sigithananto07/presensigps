@@ -13,23 +13,87 @@ use Illuminate\Support\Facades\Redirect;
 
 class PresensiController extends Controller
 {
+   
+   public function gethari()
+   { 
+      $hari = date("D");
+
+      switch ($hari) {
+            case 'Sun':
+               $hari_ini = "Minggu";
+               break;   
+
+            case 'Mon':
+                $hari_ini = "Senin";
+                break;    
+
+            case 'Tue':
+                $hari_ini = "Selasa";
+                 break;
+
+            case 'Wed':
+                $hari_ini = "Rabu";
+                break;    
+
+            case 'Thu':
+                $hari_ini = "Kamis";
+                break;    
+
+             case 'Fri':
+                $hari_ini = "Jumat";
+                break;
+
+            case 'Sat':
+                $hari_ini = "Sabtu";
+                 break;   
+
+            default:     
+                $hari_ini = "Tidak di Ketahui";
+                break; 
+            }      
+            return $hari_ini;
+   }
+   
+   
     public function create()
     {
        
         $hariini = date("Y-m-d");
+        $namahari = $this->gethari();
         $nik = Auth::guard("karyawan")->user()->nik;
+        $kode_dept = Auth::guard("karyawan")->user()->kode_dept;
         $cek= DB::table('presensi')->where('tgl_presensi', $hariini)->where('nik', $nik)->count();
-        $lok_kantor = DB::table('konfigurasi_lokasi')->where("id", 1)->first();
-        return view('presensi.create', compact('cek','lok_kantor'));
+        $kode_cabang = Auth::guard('karyawan')->user()->kode_cabang;
+        $lok_kantor = DB::table('cabang')->where('kode_cabang', $kode_cabang)->first();
+        $jamkerja = DB::table('konfigurasi_jamkerja')
+        ->join('jam_kerja','konfigurasi_jamkerja.kode_jam_kerja', '=', 'jam_kerja.kode_jam_kerja')
+        ->where('nik', $nik)->where('hari', $namahari)->first();
+
+          if($jamkerja == null) {
+             $jamkerja = DB::table('konfigurasi_jk_dept_detail')
+             ->join('konfigurasi_jk_dept','konfigurasi_jk_dept_detail.kode_jk_dept','=','konfigurasi_jk_dept.kode_jk_dept')
+             ->join('jam_kerja','konfigurasi_jk_dept_detail.kode_jam_kerja', '=', 'jam_kerja.kode_jam_kerja')
+             ->where('kode_dept', $kode_dept)
+             ->where('kode_cabang', $kode_cabang)
+             ->where('hari', $namahari)->first();
+          }
+        
+
+        if($jamkerja == null) {
+          return view('presensi.notifjadwal');
+        } else {
+        return view('presensi.create', compact('cek','lok_kantor','jamkerja'));
+        }
     }
   
     public function store(Request $request)
     {
         $nik =  Auth::guard('karyawan')->user()->nik;
+        $kode_cabang =  Auth::guard('karyawan')->user()->kode_cabang;
         $tgl_presensi = date("Y-m-d");
         $jam = date("H:i:s");
-        $lok_kantor = DB::table('konfigurasi_lokasi')->where("id", 1)->first();
-        $lok = explode(",", $lok_kantor->lokasi_kantor);
+        $lok_kantor = DB::table('cabang')->where("kode_cabang", $kode_cabang)->first();
+        $lok = explode(",", $lok_kantor->lokasi_cabang);
 
         $latitudekantor = $lok[0]; 
         $longitudekantor = $lok[1];
@@ -40,6 +104,16 @@ class PresensiController extends Controller
 
         $jarak = $this->distance($latitudekantor,$longitudekantor,$latitudeuser,$longitudeuser);
         $radius = round($jarak["meters"]);
+        
+        //Cek Jam Kerja Karyawan
+        $namahari = $this->gethari();
+        $jamkerja = DB::table('konfigurasi_jamkerja')
+        ->join('jam_kerja','konfigurasi_jamkerja.kode_jam_kerja', '=', 'jam_kerja.kode_jam_kerja')
+        ->where('nik', $nik)->where('hari', $namahari)->first();
+
+       
+        
+    
         $cek= DB::table('presensi')->where('tgl_presensi', $tgl_presensi)->where('nik', $nik)->count();
         if($cek > 0) {
           $ket = "out";
@@ -56,41 +130,52 @@ class PresensiController extends Controller
         $file = $folderPath . $fileName;
         
        
-        if($radius > $lok_kantor->radius){
+        if($radius > $lok_kantor->radius_cabang){
             echo "error|Maaf Anda Berada Diluar Radius Kantor, jarak Anda " . $radius . " meter dari Kantor|radius";
         } else {
-        if($cek > 0) {
-            $data_pulang = [
-                'jam_out' =>  $jam,
-                'foto_out' => $fileName,
-                'lokasi_out' => $lokasi
-            ];
-           $update = DB::table('presensi')->where('tgl_presensi', $tgl_presensi)->where('nik', $nik)->update($data_pulang);
-           if ($update) {
-            echo "success|Terimakasih, Hati Hati Di Jalan|out";
-            Storage::put($file, $image_base64);
-        } else {
-            echo "Error|Maaf Gagal Absen. Hubungi Team IT|out";
-        }   
-        } else {
-            $data = [
-                'nik' => $nik,
-                'tgl_presensi' => $tgl_presensi,
-                'jam_in' =>  $jam,
-                'foto_in' => $fileName,
-                'lokasi_in' => $lokasi
-            ];
-    
-            $simpan = DB::table('presensi')->insert($data);
-            if ($simpan) {
-                echo "success|Terimakasih, Selamat Bekerja|in";
+            if($cek > 0) {
+            if($jam < $jamkerja->jam_pulang) {
+                echo "Error|Maaf Belum Waktunya Pulang |out";
+              } else {
+                $data_pulang = [
+                    'jam_out' =>  $jam,
+                    'foto_out' => $fileName,
+                    'lokasi_out' => $lokasi
+                ];
+               $update = DB::table('presensi')->where('tgl_presensi', $tgl_presensi)->where('nik', $nik)->update($data_pulang);
+               if ($update) {
+                echo "success|Terimakasih, Hati Hati Di Jalan|out";
                 Storage::put($file, $image_base64);
             } else {
-                echo "Error|Maaf Gagal Absen. Hubungi Team IT|in";
+                echo "Error|Maaf Gagal Absen. Hubungi Team IT|out";
+            }   
             }    
-
-        }
-
+            
+        } else {
+            if($jam < $jamkerja->awal_jam_masuk) {
+                echo "Error|Maaf belum waktunya melakukan Presensi|in";
+            } else if ($jam > $jamkerja->akhir_jam_masuk) {
+                echo "Error|Maaf Waktu Presensi Sudah Habis|in";
+            } else {
+                
+                $data = [
+                    'nik' => $nik,
+                    'tgl_presensi' => $tgl_presensi,
+                    'jam_in' =>  $jam,
+                    'foto_in' => $fileName,
+                    'lokasi_in' => $lokasi,
+                    'kode_jam_kerja' => $jamkerja->kode_jam_kerja
+                ];
+        
+                $simpan = DB::table('presensi')->insert($data);
+                if ($simpan) {
+                    echo "success|Terimakasih, Selamat Bekerja|in";
+                    Storage::put($file, $image_base64);
+                } else {
+                    echo "Error|Maaf Gagal Absen. Hubungi Team IT|in";
+                }    
+             }            
+         }
       } 
     }
 
@@ -123,6 +208,9 @@ class PresensiController extends Controller
     $no_hp = $request->no_hp;
     $password = Hash::make($request->password);
     $karyawan = DB::table('karyawan')->where('nik', $nik)->first();
+    $request->validate([
+        'foto' => 'required|image|mimes:png,jpg|max:500'
+    ]);
      if($request->hasFile('foto')){
         $foto = $nik .".". $request->file('foto')->getClientOriginalExtension();
     } else {
@@ -229,7 +317,8 @@ class PresensiController extends Controller
    {
       $tanggal = $request->tanggal;
       $presensi = DB::table('presensi')
-      ->select('presensi.*','nama_lengkap','nama_dept')
+      ->select('presensi.*','nama_lengkap','karyawan.kode_dept','jam_masuk','nama_jam_kerja','jam_masuk','jam_pulang')
+      ->leftJoin('jam_kerja','presensi.kode_jam_kerja', '=' ,'jam_kerja.kode_jam_kerja')
       ->join('karyawan','presensi.nik','=','karyawan.nik')
       ->join('departemen','karyawan.kode_dept','=','departemen.kode_dept')
       ->where('tgl_presensi', $tanggal)
@@ -264,11 +353,22 @@ class PresensiController extends Controller
         ->first();
          
         $presensi = DB::table('presensi')
+        ->leftJoin('jam_kerja','presensi.kode_jam_kerja', '=' ,'jam_kerja.kode_jam_kerja')
         ->where('nik',$nik)
         ->whereRaw('MONTH(tgl_presensi)="'.$bulan.'"')
         ->whereRaw('YEAR(tgl_presensi)="'.$tahun.'"')
         ->orderBy('tgl_presensi')
         ->get();
+
+        if (isset($_POST['exportexcel'])) {
+            $time = date("d-M-Y H:i:s");
+         // Fungsi header dental mengirimkan raw data excel
+        header("Content-type: application/vnd-ms-excel.xls");
+        //Mendefinisikan nama file eksport “hasil-export.xls”
+        header("Content-Disposition: attachment; filename:=Laporan Presensi Karyawan $time.xls");
+        return view('presensi.cetaklaporanexcel', compact('bulan','tahun','namabulan','karyawan','presensi'));
+        } 
+        
         return view('presensi.cetaklaporan', compact('bulan','tahun','namabulan','karyawan','presensi'));
    }
 
@@ -285,7 +385,7 @@ class PresensiController extends Controller
     $tahun = $request->tahun;
     $namabulan = ["","Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
     $rekap = DB::table('presensi')
-    ->selectRaw('presensi.nik,nama_lengkap, 
+    ->selectRaw('presensi.nik,nama_lengkap,jam_masuk,jam_pulang, 
     MAX(IF(DAY(tgl_presensi) = 1,CONCAT(jam_in,"-",IFNULL(jam_out,"00:00:00")),"")) as tgl_1,
     MAX(IF(DAY(tgl_presensi) = 2,CONCAT(jam_in,"-",IFNULL(jam_out,"00:00:00")),"")) as tgl_2,
     MAX(IF(DAY(tgl_presensi) = 3,CONCAT(jam_in,"-",IFNULL(jam_out,"00:00:00")),"")) as tgl_3,
@@ -318,10 +418,19 @@ class PresensiController extends Controller
     MAX(IF(DAY(tgl_presensi) = 30,CONCAT(jam_in,"-",IFNULL(jam_out,"00:00:00")),"")) as tgl_30,
     MAX(IF(DAY(tgl_presensi) = 31,CONCAT(jam_in,"-",IFNULL(jam_out,"00:00:00")),"")) as tgl_31')
     ->join('karyawan','presensi.nik','=','karyawan.nik')
+    ->leftJoin('jam_kerja','presensi.kode_jam_kerja', '=' ,'jam_kerja.kode_jam_kerja')
     ->whereRaw('MONTH(tgl_presensi)="'.$bulan.'"')
     ->whereRaw('YEAR(tgl_presensi)="'.$tahun.'"')
-    ->groupByRaw('presensi.nik,nama_lengkap')
+    ->groupByRaw('presensi.nik,nama_lengkap,jam_masuk,jam_pulang')
     ->get();
+
+    if (isset($_POST['exportexcel'])) {
+        $time = date("d-M-Y H:i:s");
+     // Fungsi header dental mengirimkan raw data excel
+    header("Content-type: application/vnd-ms-excel.xls");
+    //Mendefinisikan nama file eksport “hasil-export.xls”
+    header("Content-Disposition: attachment; filename:=Rekap Presensi Karyawan $time.xls");
+    } 
 
     return view('presensi.cetakrekap', compact('bulan', 'tahun', 'namabulan', 'rekap'));
 
